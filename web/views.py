@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from json import JSONEncoder
 from django.views.decorators.csrf import csrf_exempt
@@ -9,6 +9,7 @@ from django.utils.crypto import get_random_string
 from captcha.fields import ReCaptchaField
 from django.conf import settings
 from django.contrib.auth.hashers import make_password, check_password
+from django.db.models import Sum, Count
 
 
 # Create your views here.
@@ -94,6 +95,20 @@ def register(request):
         context = {'message': ''}
         return render(request, 'register.html', context)
 
+
+@csrf_exempt
+def generalstat(request):
+    # TODO: should get a valid duration (from - to), if not, use 1 mounth
+    # TODO: is the token valid?
+    this_token = request.POST['token']
+    this_user = get_object_or_404(User, token__token=this_token)
+    income = Income.objects.filter(user=this_user).aggregate(Count('amount'), Sum('amount'))
+    expense = Expense.objects.filter(user=this_user).aggregate(Count('amount'), Sum('amount'))
+    context = {}
+    context['expense'] = expense
+    context['income'] = income
+    # return {'income':'INCOME','expanse':'EXPANSE'}
+    return JsonResponse(context, encoder=JSONEncoder)
 
 
 @csrf_exempt
