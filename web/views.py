@@ -26,6 +26,28 @@ def grecaptcha_verify(request):
     pass
 
 
+@csrf_exempt
+def login(request):
+    # check if POST objects has username and password
+    if 'username' in request.POST and 'password' in request.POST:
+        username = request.POST['username']
+        password = request.POST['password']
+        this_user = get_object_or_404(User, username=username)
+        if check_password(password, this_user.password):  # authentication
+            this_token = get_object_or_404(Token, user=this_user)
+            token = this_token.token
+            content = {}
+            content['result'] = 'ok'
+            content['token'] = token
+            # return {'status':'ok','token':'TOKEN'}
+            return JsonResponse(content, encoder=JSONEncoder)
+        else:
+            content = {}
+            content['result'] = 'error'
+            # return {'status':'error'}
+            return JsonResponse(content, encoder=JSONEncoder)
+
+
 def register(request):
     if 'requestcode' in request.POST: # form is filled. if not spam, generate code and save in db. wait for email confirmation, return message.
         
