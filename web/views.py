@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from json import JSONEncoder
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from .models import User, Token, Expense, Income, Passwordresetcodes
 from datetime import datetime
 from django.contrib.auth.models import User
@@ -10,6 +11,7 @@ from captcha.fields import ReCaptchaField
 from django.conf import settings
 from django.contrib.auth.hashers import make_password, check_password
 from django.db.models import Sum, Count
+from django.core import serializers
 
 
 # Create your views here.
@@ -27,6 +29,7 @@ def grecaptcha_verify(request):
 
 
 @csrf_exempt
+@require_POST
 def login(request):
     # check if POST objects has username and password
     if 'username' in request.POST and 'password' in request.POST:
@@ -119,6 +122,29 @@ def register(request):
 
 
 @csrf_exempt
+@require_POST
+def query_expenses(request):
+    this_token = request.POST['token']
+    num = request.POST.get(num, 10)
+    this_user = get_object_or_404(User, token__token=this_token)
+    expenses = Expense.objects.filter(user=this_user).order_by('-date')[:num]
+    expenses_serialized = serializers.serialize("json", expenses)
+    return JsonResponse(expenses_serialized, encoder=JSONEncoder, safe=False)
+
+
+@csrf_exempt
+@require_POST
+def query_incomes(request):
+    this_token = request.POST['token']
+    num = request.POST.get('num', 10)
+    this_user = get_object_or_404(User, token__token=this_token)
+    incomes = Income.objects.filter(user=this_user).order_by('-date')[:num]
+    incomes_serialized = serializers.serialize("json", incomes)
+    return JsonResponse(incomes_serialized, encoder=JSONEncoder, safe=False)
+
+
+@csrf_exempt
+@require_POST
 def generalstat(request):
     # TODO: should get a valid duration (from - to), if not, use 1 mounth
     # TODO: is the token valid?
@@ -134,32 +160,72 @@ def generalstat(request):
 
 
 @csrf_exempt
-def submit_income(request):
-    """user submit an income"""
-
-    #TODO: validate data. user might be fake. token might be fake. amount might be...
-    this_token = request.POST['token']
-    this_user = User.objects.filter(token__token=this_token).get()
-    if 'date' not in request.POST:
-        date = datetime.now()
-    Income.objects.create(title=request.POST['title'], amount=request.POST['amount'], date=date, user=this_user)
-
+@require_POST
+def edit_expense(request):
+    """ edit an income """
+    this_title = request.POST['title'] if 'title' in request.POST else ""
+    this_amount = request.POST['amount'] if 'amount' in request.POST else "0"
+    this_pk = request.POST['id'] if 'id' in request.POST else "-1"
+    this_token = request.POST['token'] if 'token' in request.POST else ""
+    this_user = get_object_or_404(User, token__token=this_token)
+    
+    this_expense = get_object_or_404(Expense, pk=this_pk, user=this_user)
+    this_expense.title = this_title
+    this_expense.amount = this_amount
+    this_expense.save()
     return JsonResponse({
-        'status': 'ok'
+        'status': 'ok',
     }, encoder=JSONEncoder)
 
 
 @csrf_exempt
-def submit_expense(request):
-    """user submit an expense"""
+@require_POST
+def edit_income(request):
+    """ edit an income """    
+    this_title = request.POST['title'] if 'title' in request.POST else ""
+    this_amount = request.POST['amount'] if 'amount' in request.POST else "0"
+    this_pk = request.POST['id'] if 'id' in request.POST else "0"
+    this_token = request.POST['token'] if 'token' in request.POST else ""
+    this_user = get_object_or_404(User, token__token=this_token)
 
-    #TODO: validate data. user might be fake. token might be fake. amount might be...
-    this_token = request.POST['token']
-    this_user = User.objects.filter(token__token=this_token).get()
-    if 'date' not in request.POST:
-        date = datetime.now()
-    Expense.objects.create(title=request.POST['title'], amount=request.POST['amount'], date=date, user=this_user)
-
+    this_income = get_object_or_404(Income, pk=this_pk, user=this_user)
+    this_income.title = this_title
+    this_income.amount = this_amount
+    this_income.save()
     return JsonResponse({
-        'status': 'ok'
+        'status': 'ok',
     }, encoder=JSONEncoder)
+
+
+@csrf_exempt
+@require_POST
+def submit_income(request):
+    """ submit an income """
+    # TODO: revise validation for the amount
+    this_date = request.POST['date'] if 'date' in request.POST else timezone.now()
+    this_text = request.POST['text'] if 'text' in request.POST else ""
+    this_amount = request.POST['amount'] if 'amount' in request.POST else "0"
+    this_token = request.POST['token'] if 'token' in request.POST else ""
+    this_user = get_object_or_404(User, token__token=this_token)
+
+    Income.objects.create(user=this_user, amount=this_amount, text=this_text, date=this_date)
+    return JsonResponse({
+        'status': 'ok',
+    }, encoder=JSONEncoder)
+
+
+@csrf_exempt
+@require_POST
+def submit_expense(request):
+    """ submit an expense """
+    # TODO: revise validation for the amount
+    this_date = request.POST['date'] if 'date' in request.POST else timezone.now()
+    this_text = request.POST['text'] if 'text' in request.POST else ""
+    this_amount = request.POST['amount'] if 'amount' in request.POST else "0"
+    this_token = request.POST['token'] if 'token' in request.POST else ""
+    this_user = get_object_or_404(User, token__token=this_token)
+
+    Expense.objects.create(user=this_user, amount=this_amount, text=this_text, date=this_date)
+    return JsonResponse({
+        'status': 'ok',
+    }, encoder=JSONEncoder)  # return {'status':'ok'}

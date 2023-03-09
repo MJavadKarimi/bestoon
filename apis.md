@@ -26,3 +26,13 @@ submit/income/
     POST, returns a json
     input: fromdate (optional), todate(optional), token
     output: json from some general stats related to this user
+
+q/expenses/
+    POST, returns a json
+    input: token, num (optional, default is 10)
+    output: last num expenses
+
+q/incomes/
+    POST, returns a json
+    input: token, num (optional, default is 10)
+    output: last num incomes
